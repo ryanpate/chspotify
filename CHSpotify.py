@@ -71,7 +71,7 @@ socketio = SocketIO(app, cors_allowed_origins="*")
 # Session & OAuth configuration
 app.secret_key = os.getenv('FLASK_SECRET_KEY', 'supersecret')
 SCOPE = 'streaming user-read-playback-state user-modify-playback-state'
-REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:8000/callback')
+REDIRECT_URI = os.getenv('REDIRECT_URI')
 oauth = SpotifyOAuth(client_id=CLIENT_ID,
                      client_secret=CLIENT_SECRET,
                      redirect_uri=REDIRECT_URI,
