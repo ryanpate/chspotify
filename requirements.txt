@@ -42,6 +42,7 @@ GitPython==3.1.44
 google-pasta==0.2.0
 GPUtil==1.4.0
 grpcio==1.71.0
+gunicorn
 h11==0.16.0
 h5py==3.13.0
 holidays==0.74
