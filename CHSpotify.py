@@ -1,3 +1,6 @@
+# Patch eventlet for SSL and socket before any other imports
+import eventlet
+eventlet.monkey_patch()
 # app.py
 import os
 import json
