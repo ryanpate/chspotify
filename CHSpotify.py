@@ -100,10 +100,100 @@ def index():
     if not token_info:
         return '<p>Please <a href="{}">log in with Spotify</a> to play full tracks.</p>'.format(url_for('login'))
     access_token = token_info['access_token']
-    embed_url = f"https://open.spotify.com/embed/playlist/{PLAYLIST_ID}"
-    return render_template_string("""
+    return render_template_string('''
 <!doctype html>
-<html><head>... rest of template ...""",
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>CH Worship New Song Review</title>
+  <style>
+    body { background-color: #121212; color: #e0e0e0; font-family: Arial, sans-serif; margin:0; padding:20px; }
+    h1, h2 { color:#ffffff; margin-bottom:20px; }
+    .container { max-width:900px; margin:0 auto; }
+    #player { width:100%; height:80px; margin-bottom:20px; }
+    label, select, button { margin-right:10px; vertical-align:middle; }
+    ul { list-style:none; padding:0; }
+    li { background:#1e1e1e; padding:10px; margin-bottom:10px; border-radius:4px; display:flex; align-items:center; }
+    .track-info { flex:1; overflow-wrap:anywhere; }
+    .vote-actions { display:flex; align-items:center; gap:10px; }
+    button.vote-btn { background:#3f51b5; color:#fff; border:none; padding:8px 12px; border-radius:4px; cursor:pointer; }
+    button.vote-btn:hover { background:#303f9f; }
+  </style>
+  <script src="https://sdk.scdn.co/spotify-player.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div id="player"></div>
+    <script>
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        const token = "{{ access_token }}";
+        const player = new Spotify.Player({
+          name: 'CH Spotify Web Player',
+          getOAuthToken: cb => { cb(token); }
+        });
+        player.connect().then(success => {
+          if (success) {
+            player.play({
+              spotify_uri: 'spotify:playlist:{{ PLAYLIST_ID }}',
+              playerInstance: player
+            });
+          }
+        });
+      };
+    </script>
+    <h1>CH Worship New Song Review</h1>
+    <p><a href="/stats" style="color:#3f51b5; text-decoration:none;">View Statistics →</a></p>
+    <label for="user-select">Your Name:</label>
+    <select id="user-select">
+      <option value="" disabled selected>Select your name</option>
+      {% for user in users %}
+        <option value="{{ user }}">{{ user }}</option>
+      {% endfor %}
+    </select>
+    <button id="update-users-btn">Update Users</button>
+    <h2>Vote for Your Favorite Tracks</h2>
+    <ul>
+      {% for track in tracks %}
+        <li>
+          <div class="track-info">{{ track.name }} — {{ track.artist }}</div>
+          <div class="vote-actions">
+            <button class="vote-btn" onclick="react('{{ track.id }}', 'like')">👍 Like</button>
+            <strong id="like-{{ track.id }}">{{ votes[track.id]['like'] }}</strong>
+            <button class="vote-btn" onclick="react('{{ track.id }}', 'dislike')">👎 Dislike</button>
+            <strong id="dislike-{{ track.id }}">{{ votes[track.id]['dislike'] }}</strong>
+          </div>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.min.js"></script>
+<script>
+  var socket = io();
+  socket.on('reaction_update', function(data) {
+    var el = document.getElementById(data.action + '-' + data.track_id);
+    if (el) el.innerText = data.count;
+  });
+  function react(track_id, action) {
+    var name = document.getElementById('user-select').value;
+    if (!name) { alert('Please select a user before voting.'); return; }
+    fetch('/react', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({track_id: track_id, action: action, name: name})
+    }).then(response => {
+      if (response.status === 403) alert('You have already voted for this song.');
+      else if (response.status !== 204) alert('Error: ' + response.statusText);
+    });
+  }
+  document.getElementById('update-users-btn').addEventListener('click', function() {
+    var pin = prompt('Enter PIN to update users:');
+    if (pin !== '2006') { alert('Incorrect PIN'); return; }
+    window.location = '/users';
+  });
+</script>
+</body>
+</html>
+''',
         access_token=access_token,
         PLAYLIST_ID=PLAYLIST_ID,
         tracks=tracks,
