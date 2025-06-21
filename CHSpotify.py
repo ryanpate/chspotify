@@ -68,16 +68,28 @@ else:
 # ——— SocketIO setup ———
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+@app.route('/debug-redirect-uri')
+def debug_uri():
+    return oauth.redirect_uri
+
 @app.route('/login')
 def login():
     return redirect(oauth.get_authorize_url())
 
 @app.route('/callback')
 def callback():
-    code = request.args.get('code')
-    token_info = oauth.get_access_token(code)
-    session['token_info'] = token_info
-    return redirect(url_for('index'))
+    try:
+        code = request.args.get('code')
+        token_info = oauth.get_access_token(code)
+        # Some spotipy versions return (token_info, state)
+        if isinstance(token_info, tuple):
+            token_info = token_info[0]
+        session['token_info'] = token_info
+        return redirect(url_for('index'))
+    except Exception as e:
+        import traceback
+        tb = traceback.format_exc()
+        return f"<pre>Callback error:\\n{tb}</pre>", 500
 
 @app.route('/', methods=['GET'])
 def index():
