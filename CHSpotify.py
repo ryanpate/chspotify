@@ -141,6 +141,11 @@ def index():
         });
       };
     </script>
+    <!-- Spotify Embed for visual playlist -->
+    <iframe src="https://open.spotify.com/embed/playlist/{{ PLAYLIST_ID }}"
+            width="100%" height="380"
+            frameborder="0" allowtransparency="true" allow="encrypted-media">
+    </iframe>
     <h1>CH Worship New Song Review</h1>
     <p><a href="/stats" style="color:#3f51b5; text-decoration:none;">View Statistics →</a></p>
     <label for="user-select">Your Name:</label>
