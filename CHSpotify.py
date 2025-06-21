@@ -10,13 +10,13 @@ VOTES_FILE = 'votes.json'
 USERS_FILE = 'users.json'
 
 # ——— Configuration ———
-CLIENT_ID = os.environ['SPOTIFY_CLIENT_ID']
+CLIENT_ID     = os.environ['SPOTIFY_CLIENT_ID']
 CLIENT_SECRET = os.environ['SPOTIFY_CLIENT_SECRET']
-PLAYLIST_ID = os.environ['SPOTIFY_PLAYLIST_ID']
+PLAYLIST_ID   = os.environ['SPOTIFY_PLAYLIST_ID']
 
 # ——— Spotify setup (Client Credentials for metadata) ———
 credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID,
-                                               client_secret=CLIENT_SECRET)
+                                              client_secret=CLIENT_SECRET)
 sp = spotipy.Spotify(client_credentials_manager=credentials_manager)
 
 # ——— OAuth Setup for Playback ———
@@ -30,22 +30,18 @@ oauth = SpotifyOAuth(client_id=CLIENT_ID,
                      scope=SCOPE)
 
 # ——— Fetch all tracks from the playlist ———
-
-
 def fetch_playlist_tracks(pid):
     all_tracks = []
     results = sp.playlist_items(pid)
     while True:
         for item in results['items']:
             t = item['track']
-            all_tracks.append(
-                {'id': t['id'], 'name': t['name'], 'artist': t['artists'][0]['name']})
+            all_tracks.append({'id': t['id'], 'name': t['name'], 'artist': t['artists'][0]['name']})
         if results['next']:
             results = sp.next(results)
         else:
             break
     return all_tracks
-
 
 tracks = fetch_playlist_tracks(PLAYLIST_ID)
 
@@ -72,11 +68,9 @@ else:
 # ——— SocketIO setup ———
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-
 @app.route('/login')
 def login():
     return redirect(oauth.get_authorize_url())
-
 
 @app.route('/callback')
 def callback():
@@ -84,7 +78,6 @@ def callback():
     token_info = oauth.get_access_token(code)
     session['token_info'] = token_info
     return redirect(url_for('index'))
-
 
 @app.route('/', methods=['GET'])
 def index():
@@ -96,15 +89,13 @@ def index():
     return render_template_string("""
 <!doctype html>
 <html><head>... rest of template ...""",
-                                  access_token=access_token,
-                                  PLAYLIST_ID=PLAYLIST_ID,
-                                  tracks=tracks,
-                                  votes=votes,
-                                  users=users)
+        access_token=access_token,
+        PLAYLIST_ID=PLAYLIST_ID,
+        tracks=tracks,
+        votes=votes,
+        users=users)
 
 # ——— React endpoint ———
-
-
 @app.route('/react', methods=['POST'])
 def react():
     data = request.get_json()
@@ -121,15 +112,12 @@ def react():
     votes[tid]['voters'].append(voter)
     with open(VOTES_FILE, 'w') as f:
         json.dump(votes, f)
-    socketio.emit('reaction_update', {
-                  'track_id': tid, 'action': act, 'count': votes[tid][act]})
+    socketio.emit('reaction_update', {'track_id': tid, 'action': act, 'count': votes[tid][act]})
     return ('', 204)
-
 
 @app.route('/stats')
 def stats():
     ...  # stats logic unchanged
-
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8000)
