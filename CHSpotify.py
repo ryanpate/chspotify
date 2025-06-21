@@ -127,20 +127,24 @@ def index():
     <script>
       window.onSpotifyWebPlaybackSDKReady = () => {
         const token = "{{ access_token }}";
-        const player = new Spotify.Player({
+        window.player = new Spotify.Player({
           name: 'CH Spotify Web Player',
           getOAuthToken: cb => { cb(token); }
         });
-        player.connect().then(success => {
-          if (success) {
-            player.play({
-              spotify_uri: 'spotify:playlist:{{ PLAYLIST_ID }}',
-              playerInstance: player
-            });
-          }
-        });
+        window.player.connect();
       };
+      function playTrack(track_id) {
+        window.player.play({
+          spotify_uri: 'spotify:track:' + track_id,
+          position_ms: 0
+        });
+      }
     </script>
+    <!-- Spotify Embed for visual playlist -->
+    <iframe src="https://open.spotify.com/embed/playlist/{{ PLAYLIST_ID }}"
+            width="100%" height="380"
+            frameborder="0" allowtransparency="true" allow="encrypted-media">
+    </iframe>
     <h1>CH Worship New Song Review</h1>
     <p><a href="/stats" style="color:#3f51b5; text-decoration:none;">View Statistics →</a></p>
     <label for="user-select">Your Name:</label>
@@ -155,6 +159,7 @@ def index():
     <ul>
       {% for track in tracks %}
         <li>
+          <button class="vote-btn" onclick="playTrack('{{ track.id }}')">▶️ Play</button>
           <div class="track-info">{{ track.name }} — {{ track.artist }}</div>
           <div class="vote-actions">
             <button class="vote-btn" onclick="react('{{ track.id }}', 'like')">👍 Like</button>
