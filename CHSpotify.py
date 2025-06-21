@@ -5,6 +5,8 @@ import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from flask_socketio import SocketIO
 import json
+from flask import session, url_for
+from spotipy.oauth2 import SpotifyOAuth
 VOTES_FILE = 'votes.json'
 USERS_FILE = 'users.json'
 
@@ -66,9 +68,36 @@ else:
 app = Flask(__name__)
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Session & OAuth configuration
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'supersecret')
+SCOPE = 'streaming user-read-playback-state user-modify-playback-state'
+REDIRECT_URI = os.getenv('REDIRECT_URI', 'http://localhost:8000/callback')
+oauth = SpotifyOAuth(client_id=CLIENT_ID,
+                     client_secret=CLIENT_SECRET,
+                     redirect_uri=REDIRECT_URI,
+                     scope=SCOPE)
+
+@app.route('/login')
+def login():
+    auth_url = oauth.get_authorize_url()
+    return redirect(auth_url)
+
+@app.route('/callback')
+def callback():
+    code = request.args.get('code')
+    token_info = oauth.get_access_token(code)
+    session['token_info'] = token_info
+    return redirect(url_for('index'))
+
 @app.route('/', methods=['GET'])
 def index():
-    embed_url = f"https://open.spotify.com/embed/playlist/{PLAYLIST_ID}"
+    token_info = session.get('token_info', None)
+    if not token_info:
+        return render_template_string('''
+          <p>Please <a href="{{ url_for('login') }}">log in with Spotify</a> to play full tracks.</p>
+      ''')
+    access_token = token_info['access_token']
+
     return render_template_string('''
 <!doctype html>
 <html>
@@ -90,13 +119,6 @@ def index():
     .container {
       max-width: 900px;
       margin: 0 auto;
-    }
-    iframe {
-      width: 100%;
-      height: 500px;
-      border-radius: 8px;
-      border: none;
-      margin-bottom: 20px;
     }
     ul {
       list-style: none;
@@ -135,12 +157,27 @@ def index():
 </head>
 <body>
   <div class="container">
+    <div id="player"></div>
+    <script src="https://sdk.scdn.co/spotify-player.js"></script>
+    <script>
+      window.onSpotifyWebPlaybackSDKReady = () => {
+        const token = "{{ access_token }}";
+        const player = new Spotify.Player({
+          name: 'CH Spotify Web Player',
+          getOAuthToken: cb => { cb(token); }
+        });
+        player.connect().then(success => {
+          if (success) {
+            player.play({
+              spotify_uri: 'spotify:playlist:{{ PLAYLIST_ID }}',
+              playerInstance: player
+            });
+          }
+        });
+      };
+    </script>
     <h1>CH Worship New Song Review</h1>
     <p><a href="/stats" style="color:#3f51b5; text-decoration:none;">View Statistics →</a></p>
-    <!-- Spotify Embed -->
-    <iframe src="{{ embed_url }}"
-            frameborder="0" allowtransparency="true" allow="encrypted-media">
-    </iframe>
 
     <label for="user-select">Your Name:</label>
     <select id="user-select">
@@ -203,7 +240,7 @@ def index():
 </script>
 </body>
 </html>
-''', embed_url=embed_url, tracks=tracks, votes=votes, users=users)
+''', access_token=access_token, PLAYLIST_ID=PLAYLIST_ID, tracks=tracks, votes=votes, users=users)
 
 
 @app.route('/react', methods=['POST'])
