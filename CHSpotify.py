@@ -225,9 +225,123 @@ def react():
     socketio.emit('reaction_update', {'track_id': tid, 'action': act, 'count': votes[tid][act]})
     return ('', 204)
 
-@app.route('/stats')
+
+# ——— Statistics endpoint ———
+@app.route('/stats', methods=['GET'])
 def stats():
-    ...  # stats logic unchanged
+    # Compute top 10 lists
+    liked     = sorted(tracks, key=lambda t: votes[t['id']]['like'],    reverse=True)[:10]
+    disliked  = sorted(tracks, key=lambda t: votes[t['id']]['dislike'], reverse=True)[:10]
+    # Some tracks may have no popularity key
+    popular   = sorted(tracks, key=lambda t: t.get('popularity', 0),    reverse=True)[:10]
+
+    # Prepare data for Plotly
+    liked_labels    = [f"{t['name']} — {t['artist']}" for t in liked]
+    liked_values    = [votes[t['id']]['like'] for t in liked]
+    disliked_labels = [f"{t['name']} — {t['artist']}" for t in disliked]
+    disliked_values = [votes[t['id']]['dislike'] for t in disliked]
+    popular_labels  = [f"{t['name']} — {t['artist']}" for t in popular]
+    popular_values  = [t.get('popularity', 0) for t in popular]
+
+    return render_template_string('''
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Statistics – CH Worship Review</title>
+  <style>
+    body { background:#121212; color:#e0e0e0; font-family:Arial,sans-serif; padding:20px; margin:0; }
+    .container { max-width:900px; margin:0 auto; }
+    h1 { color:#fff; margin-bottom:20px; }
+    a { color:#3f51b5; text-decoration:none; }
+    .chart-container { margin-bottom: 60px; }
+    .charts-grid { display: grid; grid-template-columns: repeat(2, 1fr); grid-gap: 40px; }
+    .chart-span2 { grid-column: span 2; }
+  </style>
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <h1>🎵 Voting Statistics</h1>
+    <p><a href="/">← Back to Voting</a></p>
+    <button id="reset-btn">Reset All Stats</button>
+    <div class="charts-grid">
+      <div id="chart-likes" class="chart-container"></div>
+      <div id="chart-dislikes" class="chart-container"></div>
+      <div id="chart-popularity" class="chart-container chart-span2"></div>
+    </div>
+  </div>
+<script>
+  var likedLabels    = {{ liked_labels|tojson }};
+  var likedValues    = {{ liked_values|tojson }};
+  var dislikedLabels = {{ disliked_labels|tojson }};
+  var dislikedValues = {{ disliked_values|tojson }};
+  var popularLabels  = {{ popular_labels|tojson }};
+  var popularValues  = {{ popular_values|tojson }};
+
+  // generate distinct colors
+  var likedN = likedLabels.length;
+  var likedColors = likedLabels.map((_,i) => `hsl(${i*360/likedN},70%,50%)`);
+  var dislikedN = dislikedLabels.length;
+  var dislikedColors = dislikedLabels.map((_,i) => `hsl(${i*360/dislikedN},70%,50%)`);
+  var popularN = popularLabels.length;
+  var popularColors = popularLabels.map((_,i) => `hsl(${i*360/popularN},70%,50%)`);
+
+  var layout = {
+    paper_bgcolor: '#121212',
+    plot_bgcolor: '#121212',
+    font: { color: '#e0e0e0' },
+    height: 450,
+    margin: { t: 30, b: 100, l: 50, r: 20 }
+  };
+
+  Plotly.newPlot('chart-likes', [{
+    x: likedLabels,
+    y: likedValues,
+    type: 'bar',
+    marker: { color: likedColors }
+  }], Object.assign({}, layout, {title:'Top 10 Likes'}));
+
+  Plotly.newPlot('chart-dislikes', [{
+    x: dislikedLabels,
+    y: dislikedValues,
+    type: 'bar',
+    marker: { color: dislikedColors }
+  }], Object.assign({}, layout, {title:'Top 10 Dislikes'}));
+
+  Plotly.newPlot('chart-popularity', [{
+    x: popularLabels,
+    y: popularValues,
+    type: 'bar',
+    marker: { color: popularColors }
+  }], Object.assign({}, layout, {title:'Top 10 Spotify Popularity'}));
+
+  document.getElementById('reset-btn').addEventListener('click', function() {
+    var pin = prompt('Enter reset PIN:');
+    if (pin !== '2006') { alert('Incorrect PIN'); return; }
+    fetch('/reset', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({pin: pin})
+    }).then(response => {
+      if (response.status === 403) {
+        alert('Invalid PIN');
+      } else {
+        location.reload();
+      }
+    });
+  });
+</script>
+</body>
+</html>
+''',
+    liked_labels=liked_labels,
+    liked_values=liked_values,
+    disliked_labels=disliked_labels,
+    disliked_values=disliked_values,
+    popular_labels=popular_labels,
+    popular_values=popular_values
+)
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=8000)
